@@ -3,6 +3,8 @@
 Use any number of joysticks with OpenFrameworks.
 This add-on wraps the GLFW functionality, so it will most likely only work if your project uses a ofAppGLFWWindow.
 
+![3 joysticks](https://farm8.staticflickr.com/7300/16278716840_7e6a2ef751_z_d.jpg)
+
 #How to Use
 
 Just update the singleton object every frame:
