@@ -19,7 +19,8 @@ And then access any values from any class:
 
 ```
 	int joystickID = 0;
-	float joyX = ofxGLFWJoystick::one().getAxisValue(0, joystickID);
+	int axisID = 0;
+	float joyX = ofxGLFWJoystick::one().getAxisValue(axisID, joystickID);
 ```
 
 That's all! To know what features are supported on your joystick, or if it's supported at all, you might want to drawDebug() the joysticks:
