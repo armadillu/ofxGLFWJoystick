@@ -29,15 +29,15 @@ That's all! To know what features are supported on your joystick, or if it's sup
 ```
 
 #Notes
-Only tested on OSX. 
+* Only tested on OSX. 
 
-It seems that joysticks need to be plugged in before you launch the app for them to be detected.
+* It seems that joysticks need to be plugged in before you launch the app for them to be detected.
 
-I got an USB Xbox 360 controller to work on OSX using [this](http://tattiebogle.net/index.php/ProjectRoot/Xbox360Controller/OsxDriver).
+* I got an USB Xbox 360 controller to work on OSX using [this](http://tattiebogle.net/index.php/ProjectRoot/Xbox360Controller/OsxDriver).
 
-Access from the main thread only.
+* Access from the main thread only.
 
-You can also get raw access to the values joystick provided by GLWF without any safety checks, using getButtonsForJoystick() and getButtonsForAxis(). Just be aware that this could lead to crashes if you are not careful accessing the pointers.
+* You can also get raw access to the values joystick provided by GLWF without any safety checks, using getButtonsForJoystick() and getButtonsForAxis(). Just be aware that this could lead to crashes if you are not careful accessing the pointers.
 
 #License
 MIT
