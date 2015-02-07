@@ -113,7 +113,7 @@ void ofxGLFWJoystick::drawDebug(int x, int y){
 		bool joyOK = glfwJoystickPresent(j);
 
 		if(joyOK){
-			string msg = joyData[j].name + " numAxis: " + ofToString(joyData[j].numAxis) +
+			string msg = "'" + joyData[j].name + "' numAxis: " + ofToString(joyData[j].numAxis) +
 			"  numButtons: " + ofToString(joyData[j].numButtons);
 
 			ofSetColor(255);
