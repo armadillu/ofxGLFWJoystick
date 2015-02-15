@@ -120,7 +120,7 @@ void ofxGLFWJoystick::drawDebug(int x, int y){
 			ofDrawBitmapString(msg, 0, - 22);
 
 			for(int i = 0; i < joyData[j].numAxis; i+=2){
-				ofSetColor(255, 64);
+				ofSetColor(255, 128);
 				float xx = xOffset + joyRad * 0.5f;
 				float yy = joyRad * 0.5f;
 				ofCircle(xx, yy, joyRad);
