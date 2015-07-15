@@ -11,17 +11,36 @@
 ofxGLFWJoystick::ofxGLFWJoystick(){
 
 	numJoysticks = 0;
+	printJoystickList();
 	lookForJoysticks();
-
-	for(int i = 0; i < GLFW_JOYSTICK_LAST; i++){
-		joyData[i].available = glfwJoystickPresent(i);
-		joyData[i].name = string(glfwGetJoystickName(i));
-		joyData[i].buttonData = NULL;
-		joyData[i].axisData = NULL;
-	}
-
 	//this triggers a deadlock on OSX... sad! we'll need to manually update this...
 	//ofAddListener(ofEvents().update, &one(), &ofxGLFWJoystick::update, OF_EVENT_ORDER_BEFORE_APP);
+}
+
+
+void ofxGLFWJoystick::printJoystickList(){
+
+	map<int,string> list = getJoystickList();
+	if(list.size() == 0){
+		ofLogNotice("ofxGLFWJoystick") << "No Joysticks Found!";
+	}
+	map<int,string>::iterator it = list.begin();
+	while(it != list.end()){
+		ofLogNotice("ofxGLFWJoystick") << it->second << " >> ID " << it->first;
+		++it;
+	}
+}
+
+
+map<int,string> ofxGLFWJoystick::getJoystickList(){
+
+	map<int,string> list;
+	for(int i = 0; i < GLFW_JOYSTICK_LAST; i++){
+		if(glfwJoystickPresent(i)){
+			list[i] = string(glfwGetJoystickName(i));
+		}
+	}
+	return list;
 }
 
 
@@ -30,10 +49,13 @@ void ofxGLFWJoystick::lookForJoysticks(){
 	int n = 0;
 	for(int i = 0; i < GLFW_JOYSTICK_LAST; i++){
 		if(glfwJoystickPresent(i)){
+			joyData[i].available = true;
 			string name = string(glfwGetJoystickName(i));
 			if(name != joyData[i].name){
 				joyData[i].name = name;
 				ofLogNotice("ofxGLFWJoystick") << "Joystick Found at index " << i << ": '" << name << "'";
+				joyData[i].axisData = glfwGetJoystickAxes(i, &joyData[i].numAxis);
+				joyData[i].buttonData = glfwGetJoystickButtons(i, &joyData[i].numButtons);
 			}
 			n++;
 		}else{
@@ -56,13 +78,8 @@ void ofxGLFWJoystick::update(){
 
 	vector<string> joys;
 	for(int j = 0; j < numJoysticks; j++){
-		bool joyOK = glfwJoystickPresent(j);
-		if(joyOK){
-			joyData[j].available = true;
-			joyData[j].axisData = glfwGetJoystickAxes(j, &joyData[j].numAxis);
-			joyData[j].buttonData = glfwGetJoystickButtons(j, &joyData[j].numButtons);
-		}else{
-			joyData[j].available = false;
+		joyData[j].available = glfwJoystickPresent(j);
+		if(!joyData[j].available){
 			joyData[j].axisData = NULL;
 			joyData[j].buttonData = NULL;
 			joyData[j].numAxis = 0;
@@ -124,10 +141,10 @@ void ofxGLFWJoystick::drawDebug(int x, int y){
 				float xx = xOffset + joyRad * 0.5f;
 				float yy = joyRad * 0.5f;
 				ofCircle(xx, yy, joyRad);
-				float x = ofMap(joyData[j].axisData[i], -1, 1, -joyRad, joyRad);
+				float x = joyData[j].axisData[i] * joyRad;
 				float y = 0;
 				if(i + 1 < joyData[j].numAxis ){
-					y = ofMap(joyData[j].axisData[i + 1], -1, 1, -joyRad, joyRad);
+					y = joyData[j].axisData[i + 1] * joyRad;
 				}
 				ofColor c; c.setHsb((i * 16)%255, 255, 255);
 				ofSetColor(c);

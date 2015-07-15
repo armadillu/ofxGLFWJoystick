@@ -30,6 +30,11 @@ public:
 		return instance;
 	}
 
+
+	void printJoystickList();
+	map<int,string> getJoystickList();
+
+
 	int getNumJoysticksAvailable(){ return numJoysticks;};
 	inline bool isJoystickAvailable(int joyID);
 	string getJoystickName(int joyID);
@@ -40,7 +45,7 @@ public:
 	float getAxisValue(int axisID, int joyID);
 	unsigned char getButtonValue(int axisID, int joyID);
 
-	//direct access, careful with the pointers or you will crash!
+	//direct access, careful with the pointers/indexes or you will crash!
 	int getNumButtons(int joyID);
 	int getNumAxis(int joyID);
 	const unsigned char * getButtonsForJoystick(int joyID);
@@ -58,6 +63,12 @@ private:
 		const unsigned char * buttonData;
 		int numAxis;
 		const float * axisData;
+		JoyData(){
+			buttonData = NULL; axisData = NULL;
+			numButtons = numAxis = 0;
+			available = false;
+		}
+
 	};
 
 	int numJoysticks;
