@@ -45,6 +45,12 @@ public:
 		}
 	};
 
+	void update(){
+		if(joyID >= 0){
+			glfwJoystickPresent(joyID);
+		}
+	}
+
 	// axis
 
 	float getXaxis(){return axis[0];}
