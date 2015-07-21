@@ -1,64 +1,29 @@
 //
 //  N64Adaptoid.h
-//  emptyExample
 //
 //  Created by Oriol Ferrer Mesià on 07/02/15.
 //
 //
 
-#ifndef __emptyExample__N64Adaptoid__
-#define __emptyExample__N64Adaptoid__
+#ifndef __N64Adaptoid__
+#define __N64Adaptoid__
 
-#include "ofMain.h"
-#include "ofxGLFWJoystick.h"
+#include "GenericJoystick.h"
 
-#if (_MSC_VER)
-	#include <GLFW/glfw3.h>
-#else
-	#include "GLFW/glfw3.h"
-#endif
-
-#define CHECK_AND_RETURN(A) if(joyID >=0) A; else return 0;
-
-class N64Adaptoid{
+class N64Adaptoid : public GenericJoystick{
 
 public:
 
 	N64Adaptoid(){
-		joyID = -1;
-		axis = NULL;
-		buttons = NULL;
-	}
-
-
-	void setup(){
-
-		for(int i = 0; i < GLFW_JOYSTICK_LAST; i++){
-			if(glfwJoystickPresent(i)){
-				if( string(glfwGetJoystickName(i)) == "Adaptoid"){
-					joyID = i;
-					int nAx = 0;
-					axis = glfwGetJoystickAxes(i, &nAx);
-					int nBut = 0;
-					buttons = glfwGetJoystickButtons(i, &nBut);
-				}
-			}
-		}
-	};
-
-	void update(){
-		if(joyID >= 0){
-			glfwJoystickPresent(joyID);
-		}
+		GenericJoystick();
+		USB_ID = "Gamepad F310";
 	}
 
 	// axis
-
-	float getXaxis(){CHECK_AND_RETURN(axis[0]);}
-	float getYaxis(){CHECK_AND_RETURN(axis[1]);}
+	float getXAxis(){CHECK_AND_RETURN(axis[0]);}
+	float getYAxis(){CHECK_AND_RETURN(axis[1]);}
 
 	//buttons
-
 	bool getStart(){CHECK_AND_RETURN(buttons[8] > 0);}
 	bool getA(){CHECK_AND_RETURN(buttons[0] > 0);}
 	bool getB(){CHECK_AND_RETURN(buttons[3] > 0);}
@@ -73,14 +38,6 @@ public:
 	bool getDpadRight(){CHECK_AND_RETURN(buttons[13] > 0);}
 	bool getDpadUp(){CHECK_AND_RETURN(buttons[10] > 0);}
 	bool getDpadDown(){CHECK_AND_RETURN(buttons[11] > 0);}
-
-
-private:
-
-		const float* axis;
-		const unsigned char * buttons;
-		int joyID;
-
 
 };
 
