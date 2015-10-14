@@ -84,6 +84,9 @@ void ofxGLFWJoystick::update(){
 			joyData[j].buttonData = NULL;
 			joyData[j].numAxis = 0;
 			joyData[j].numButtons = 0;
+		}else {
+			joyData[j].axisData = glfwGetJoystickAxes(j, &joyData[j].numAxis);
+			joyData[j].buttonData = glfwGetJoystickButtons(j, &joyData[j].numButtons);
 		}
 	}
 }
