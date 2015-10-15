@@ -37,7 +37,9 @@ public:
 	void setup(){
 		for(int i = 0; i < GLFW_JOYSTICK_LAST; i++){
 			if(glfwJoystickPresent(i)){
-				if( string(glfwGetJoystickName(i)) == USB_ID){
+				string joyName = string(glfwGetJoystickName(i));
+				ofLogNotice("GenericJoystick") << "Joystick found: " << joyName;
+				if(joyName == USB_ID){
 					ofLogNotice("GenericJoystick") << "found Joystick with ID: '" << USB_ID <<
 					"' at index " << i << endl;
 					joyID = i;
@@ -51,7 +53,10 @@ public:
 
 	void update(){
 		if(joyID >= 0){
-			glfwJoystickPresent(joyID);
+			if (glfwJoystickPresent(joyID)) {
+				axis = glfwGetJoystickAxes(joyID, &nAxis);
+				buttons = glfwGetJoystickButtons(joyID, &nButtons);
+			}
 		}
 	}
 
