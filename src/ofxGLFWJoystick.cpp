@@ -143,7 +143,7 @@ void ofxGLFWJoystick::drawDebug(int x, int y){
 				ofSetColor(255, 128);
 				float xx = xOffset + joyRad * 0.5f;
 				float yy = joyRad * 0.5f;
-				ofCircle(xx, yy, joyRad);
+				ofDrawCircle(xx, yy, joyRad);
 				float x = joyData[j].axisData[i] * joyRad;
 				float y = 0;
 				if(i + 1 < joyData[j].numAxis ){
@@ -159,7 +159,7 @@ void ofxGLFWJoystick::drawDebug(int x, int y){
 			for(int i = 0; i < joyData[j].numButtons; i ++ ){
 				bool pressed = joyData[j].buttonData[i] > 0; //mmm not sure why its a char if its only 0/1
 				ofSetColor( pressed ? 0:255, pressed ? 255:0, 0 );
-				ofRect(xOffset, joyRad *  0.5, joyRad * 0.7, joyRad * 0.7);
+				ofDrawRectangle(xOffset, joyRad *  0.5, joyRad * 0.7, joyRad * 0.7);
 				ofSetColor(255);
 				ofDrawBitmapString(ofToString(i), xOffset - 7, joyRad * 0.5 + 22);
 				xOffset += joyRad + padding * 0.5;
