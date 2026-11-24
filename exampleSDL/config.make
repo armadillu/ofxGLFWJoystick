@@ -1,0 +1,2 @@
+OF_ROOT = ../../../OpenFrameworks
+PROJECT_DEFINES += OFX_GLFW_JOYSTICK_USE_SDL

@@ -8,13 +8,58 @@
 
 #include "ofxGLFWJoystick.h"
 
+namespace {
+struct UpdateGuard {
+	bool& updating;
+	explicit UpdateGuard(bool& flag) : updating(flag) { updating = true; }
+	~UpdateGuard() { updating = false; }
+};
+}
+
 ofxGLFWJoystick::ofxGLFWJoystick(){
 
 	numJoysticks = 0;
-	printJoystickList();
-	lookForJoysticks();
+	// GLFW discovery runs after construction: it can dispatch a nested draw.
 	//this triggers a deadlock on OSX... sad! we'll need to manually update this...
 	//ofAddListener(ofEvents().update, &one(), &ofxGLFWJoystick::update, OF_EVENT_ORDER_BEFORE_APP);
+}
+
+void ofxGLFWJoystick::initialize(){
+	if (initialized) return;
+	initialized = true;
+}
+
+void ofxGLFWJoystick::clearJoysticks(){
+	for (int i = 0; i < totalSlots; ++i) joyData[i] = JoyData();
+	numJoysticks = 0;
+}
+
+bool ofxGLFWJoystick::setProvider(Provider requested){
+	if (updating) return false;
+#ifndef OFX_GLFW_JOYSTICK_USE_SDL
+	if (requested == Provider::SDL || requested == Provider::BOTH) {
+		ofLogError("ofxGLFWJoystick") << "SDL provider not enabled. See the addon README.";
+		return false;
+	}
+#endif
+	requestedProvider = requested;
+	return true;
+}
+
+bool ofxGLFWJoystick::activateProvider(Provider requested){
+#ifdef OFX_GLFW_JOYSTICK_USE_SDL
+	if (requested != Provider::GLFW) {
+		if (!sdl.setup()) return false;
+	} else {
+		sdl.exit();
+	}
+#else
+	if (requested != Provider::GLFW) return false;
+#endif
+	clearJoysticks();
+	provider = requested;
+	providerReady = true;
+	return true;
 }
 
 
@@ -35,11 +80,8 @@ void ofxGLFWJoystick::printJoystickList(){
 map<int,string> ofxGLFWJoystick::getJoystickList(){
 
 	map<int,string> list;
-	for(int i = 0; i < GLFW_JOYSTICK_LAST; i++){
-		if(glfwJoystickPresent(i)){
-			list[i] = string(glfwGetJoystickName(i));
-		}
-	}
+	for(int i = 0; i < totalSlots; i++)
+		if (joyData[i].available) list[i] = joyData[i].name;
 	return list;
 }
 
@@ -47,7 +89,7 @@ map<int,string> ofxGLFWJoystick::getJoystickList(){
 void ofxGLFWJoystick::lookForJoysticks(){
 
 	int n = 0;
-	for(int i = 0; i < GLFW_JOYSTICK_LAST; i++){
+	for(int i = 0; i <= GLFW_JOYSTICK_LAST; i++){
 		if(glfwJoystickPresent(i)){
 			joyData[i].available = true;
 			string name = string(glfwGetJoystickName(i));
@@ -71,13 +113,18 @@ void ofxGLFWJoystick::lookForJoysticks(){
 
 
 void ofxGLFWJoystick::update(){
-
-	if(ofGetFrameNum()%600 == 1){ //update joystick info every now and then
-		lookForJoysticks();
+	if (updating) return;
+	UpdateGuard guard(updating);
+	if (!providerReady || requestedProvider != provider) {
+		if (!activateProvider(requestedProvider)) {
+			ofLogError("ofxGLFWJoystick") << "Could not initialize the requested joystick provider";
+			requestedProvider = provider;
+			if (!providerReady && !activateProvider(Provider::GLFW)) return;
+		}
 	}
-
-	vector<string> joys;
-	for(int j = 0; j < numJoysticks; j++){
+	if (provider != Provider::SDL) {
+		lookForJoysticks();
+		for(int j = 0; j <= GLFW_JOYSTICK_LAST; j++){
 		joyData[j].available = glfwJoystickPresent(j);
 		if(!joyData[j].available){
 			joyData[j].axisData = NULL;
@@ -89,7 +136,62 @@ void ofxGLFWJoystick::update(){
 			joyData[j].buttonData = glfwGetJoystickButtons(j, &joyData[j].numButtons);
 		}
 	}
+	}
+#ifdef OFX_GLFW_JOYSTICK_USE_SDL
+	if (provider != Provider::GLFW) updateSDL();
+#endif
 }
+
+#ifdef OFX_GLFW_JOYSTICK_USE_SDL
+void ofxGLFWJoystick::updateSDL(){
+	sdl.update();
+	const int first = provider == Provider::BOTH ? slotsPerProvider : 0;
+	const int end = first + slotsPerProvider;
+	// Keep IDs stable across hot-plugging, rather than using SDL's compact list index.
+	for (int slot = first; slot < end; ++slot) {
+		if (!joyData[slot].available) continue;
+		bool found = false;
+		for (int i = 0; i < sdl.size(); ++i) if (sdl.instanceID(i) == joyData[slot].instanceID) found = true;
+		if (!found) joyData[slot] = JoyData();
+	}
+	for (int i = 0; i < sdl.size(); ++i) {
+		int slot = -1;
+		for (int j = first; j < end; ++j)
+			if (joyData[j].available && joyData[j].instanceID == sdl.instanceID(i)) { slot = j; break; }
+		if (slot < 0) for (int j = first; j < end; ++j)
+			if (!joyData[j].available) { slot = j; break; }
+		if (slot < 0) break;
+		auto& d = joyData[slot];
+		d.available = true;
+		d.source = Provider::SDL;
+		d.instanceID = sdl.instanceID(i);
+		d.name = sdl.name(i);
+		d.numAxis = sdl.numRawAxes(i);
+		const int rawButtons = sdl.numRawButtons(i);
+		const int hats = sdl.numRawHats(i);
+		const bool mappedDpad = hats == 0 && sdl.isMapped(i);
+		d.numButtons = rawButtons + hats * 4 + (mappedDpad ? 4 : 0);
+		d.sdlAxes.resize(d.numAxis);
+		d.sdlButtons.resize(d.numButtons);
+		for (int a = 0; a < d.numAxis; ++a) d.sdlAxes[a] = sdl.rawAxis(i, a);
+		for (int b = 0; b < rawButtons; ++b) d.sdlButtons[b] = sdl.rawButton(i, b);
+		const Uint8 hatDirections[] = {SDL_HAT_UP, SDL_HAT_RIGHT, SDL_HAT_DOWN, SDL_HAT_LEFT};
+		for (int h = 0; h < hats; ++h)
+			for (int direction = 0; direction < 4; ++direction)
+				d.sdlButtons[rawButtons + h * 4 + direction] = (sdl.rawHat(i, h) & hatDirections[direction]) != 0;
+		if (mappedDpad) {
+			const SDL_GameControllerButton directions[] = {SDL_CONTROLLER_BUTTON_DPAD_UP, SDL_CONTROLLER_BUTTON_DPAD_RIGHT,
+				SDL_CONTROLLER_BUTTON_DPAD_DOWN, SDL_CONTROLLER_BUTTON_DPAD_LEFT};
+			for (int direction = 0; direction < 4; ++direction)
+				d.sdlButtons[rawButtons + direction] = sdl.button(i, directions[direction]);
+		}
+		d.axisData = d.sdlAxes.empty() ? nullptr : d.sdlAxes.data();
+		d.buttonData = d.sdlButtons.empty() ? nullptr : d.sdlButtons.data();
+	}
+	numJoysticks = 0;
+	for (int i = 0; i < totalSlots; ++i) if (joyData[i].available) ++numJoysticks;
+}
+#endif
 
 
 float ofxGLFWJoystick::getAxisValue(int axisID, int joyID){
@@ -115,57 +217,59 @@ unsigned char ofxGLFWJoystick::getButtonValue(int buttonID, int joyID){
 
 
 void ofxGLFWJoystick::drawDebug(int x, int y){
+	if (updating) return;
 
 	ofPushMatrix();
 	ofPushStyle();
+	ofSetRectMode(OF_RECTMODE_CORNER);
 	ofTranslate(x, y);
-	int joyRad = 25;
-	int buttonSize = 20;
-	int padding = 10;
 	float yOffset = 0;
 
-	for(int j = 0; j < numJoysticks; j++){
+	for(int j = 0; j < totalSlots; j++){
 
 
-		ofTranslate(0 , yOffset);
-
-		int xOffset = joyRad * 0.5f;
-		bool joyOK = glfwJoystickPresent(j);
+		bool joyOK = joyData[j].available;
 
 		if(joyOK){
-			string msg = "'" + joyData[j].name + "' numAxis: " + ofToString(joyData[j].numAxis) +
+			ofTranslate(0 , yOffset);
+			string msg = "[" + getJoystickProvider(j) + " ID " + ofToString(j) + "] '" + joyData[j].name + "' numAxis: " + ofToString(joyData[j].numAxis) +
 			"  numButtons: " + ofToString(joyData[j].numButtons);
 
 			ofSetColor(255);
-			ofDrawBitmapString(msg, 0, - 22);
+			ofDrawBitmapString(msg, 0, 0);
 
-			for(int i = 0; i < joyData[j].numAxis; i+=2){
-				ofSetColor(255, 128);
-				float xx = xOffset + joyRad * 0.5f;
-				float yy = joyRad * 0.5f;
-				ofCircle(xx, yy, joyRad);
-				float x = joyData[j].axisData[i] * joyRad;
-				float y = 0;
-				if(i + 1 < joyData[j].numAxis ){
-					y = joyData[j].axisData[i + 1] * joyRad;
-				}
-				ofColor c; c.setHsb((i * 16)%255, 255, 255);
-				ofSetColor(c);
-				ofDrawArrow(glm::vec3(xx, yy,0), glm::vec3(xx + x, yy + y,0), 4);
-				xOffset += joyRad * 2 + padding;
+			const float widgetY = 12;
+			const float widgetHeight = 18;
+			const float gap = 4;
+			float xOffset = 0;
+			for(int i = 0; i < joyData[j].numAxis; ++i){
+				const string label = "A " + ofToString(i);
+				// ofDrawBitmapString uses fixed-width 8 pixel characters.
+				const float axisWidth = label.size() * 8.0f + 4;
+				const float value = joyData[j].axisData[i];
+				const float markerY = widgetY + 1 + (1.0f - ofClamp(value, -1.0f, 1.0f)) * 0.5f * (widgetHeight - 2);
+				ofSetColor(70);
+				ofDrawRectangle(xOffset, widgetY, axisWidth, widgetHeight);
+				ofSetColor(130);
+				ofDrawRectangle(xOffset, widgetY + widgetHeight * 0.5f - 1, axisWidth, 2);
+				ofSetColor(255, 190, 0);
+				ofDrawRectangle(xOffset, markerY - 1, axisWidth, 2);
+				ofSetColor(255);
+				ofDrawBitmapString(label, xOffset + 2, widgetY + 32);
+				xOffset += axisWidth + gap;
 			}
 
-			ofSetRectMode(OF_RECTMODE_CENTER);
+			const float buttonSize = widgetHeight;
+			ofSetRectMode(OF_RECTMODE_CORNER);
 			for(int i = 0; i < joyData[j].numButtons; i ++ ){
 				bool pressed = joyData[j].buttonData[i] > 0; //mmm not sure why its a char if its only 0/1
 				ofSetColor( pressed ? 0:255, pressed ? 255:0, 0 );
-				ofRect(xOffset, joyRad *  0.5, joyRad * 0.7, joyRad * 0.7);
+				ofDrawRectangle(xOffset, widgetY, buttonSize, buttonSize);
 				ofSetColor(255);
-				ofDrawBitmapString(ofToString(i), xOffset - 7, joyRad * 0.5 + 22);
-				xOffset += joyRad + padding * 0.5;
+				ofDrawBitmapString(ofToString(i), xOffset, widgetY + 32);
+				xOffset += buttonSize + gap;
 			}
-			ofSetRectMode(OF_RECTMODE_CORNER);
-			yOffset = joyRad * 2 + 4 * padding;
+			yOffset = 76;
 		}
 	}
 	ofPopStyle();
@@ -174,12 +278,18 @@ void ofxGLFWJoystick::drawDebug(int x, int y){
 
 
 bool ofxGLFWJoystick::isJoystickAvailable(int joyID){
-	if(joyID < GLFW_JOYSTICK_LAST){
+	if (updating) return false;
+	if(joyID >= 0 && joyID < totalSlots){
 		if(joyData[joyID].available){
 			return true;
 		}
 	}
 	return false;
+}
+
+string ofxGLFWJoystick::getJoystickProvider(int joyID){
+	if (!isJoystickAvailable(joyID)) return "";
+	return joyData[joyID].source == Provider::SDL ? "SDL" : "GLFW";
 }
 
 
