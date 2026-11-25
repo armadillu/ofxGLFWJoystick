@@ -1,2 +1,1 @@
-..
-../../ofxSDLController
+ofxSDLController
